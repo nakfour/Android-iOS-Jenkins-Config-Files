@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.4">
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers/>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.10">
+    <script>
+
+node{
+  stage &apos;Git Pull&apos;
+  git credentialsId: &apos;ADD YOUR CRED ID&apos;, url: &apos;git@git.tom.redhatmobile.com:jnakfour/Innovation-Lab-Native-iOS-Native-iOS--Objective-C--hello-world-app.git&apos;
+
+  stage &apos;Build And Archive ipa&apos;
+  sh &apos;date +%Y-%m-%d &gt; outFile&apos;
+  def curDate = readFile(&apos;outFile&apos;).trim()
+  sh &apos;/usr/local/bin/pod install&apos;
+  sh &apos;mkdir -p /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/artifacts&apos;
+  sh &apos;/usr/bin/xcodebuild -scheme helloworld-ios-app -workspace helloworld-ios-app.xcworkspace -configuration Debug clean build archive CONFIGURATION_BUILD_DIR=/Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData&apos;
+  sh &quot;/usr/bin/xcrun -sdk iphoneos PackageApplication -v /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/helloworld-ios-app.app -o /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/artifacts/${curDate}.ipa&quot;
+
+  stage &apos;Unit Testing&apos;
+  sh&apos;/usr/bin/xcodebuild -scheme helloworld-ios-app -sdk iphonesimulator -workspace helloworld-ios-app.xcworkspace -configuration Debug build test -destination &quot;platform=iOS Simulator,name=iPhone 6s,OS=9.3&quot; | /usr/local/bin/ocunit2junit&apos;
+
+  stage &apos;Archive Artifact&apos;
+  archive &apos;DerivedData/artifacts/*.ipa&apos;
+    
+  stage &apos;Publish JUnit Test&apos;
+  step([$class: &apos;JUnitResultArchiver&apos;, testResults: &apos;test-reports/*.xml&apos;])
+    
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+</flow-definition>

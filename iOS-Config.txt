@@ -1,0 +1,22 @@
+
+node{
+  stage "Git Pull"
+  git credentialsId: "ADD YOUR CRED ID", url: "git@git.tom.redhatmobile.com:jnakfour/Innovation-Lab-Native-iOS-Native-iOS--Objective-C--hello-world-app.git"
+
+  stage "Build And Archive ipa"
+  sh "date +%Y-%m-%d &gt; outFile"
+  def curDate = readFile("outFile").trim()
+  sh "/usr/local/bin/pod install"
+  sh "mkdir -p /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/artifacts"
+  sh "/usr/bin/xcodebuild -scheme helloworld-ios-app -workspace helloworld-ios-app.xcworkspace -configuration Debug clean build archive CONFIGURATION_BUILD_DIR=/Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData"
+  sh "/usr/bin/xcrun -sdk iphoneos PackageApplication -v /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/helloworld-ios-app.app -o /Users/Shared/Jenkins/Home/workspace/iOSBuildAndTestPipeline/DerivedData/artifacts/${curDate}.ipa"
+    
+  stage "Unit Testing"
+  sh"/usr/bin/xcodebuild -scheme helloworld-ios-app -sdk iphonesimulator -workspace helloworld-ios-app.xcworkspace -configuration Debug build test -destination &quot;platform=iOS Simulator,name=iPhone 6s,OS=9.3&quot; | /usr/local/bin/ocunit2junit"
+
+  stage "Archive Artifact"
+  archive "DerivedData/artifacts/*.ipa"
+    
+  stage "Publish JUnit Test"
+  step([$class: "JUnitResultArchiver", testResults: "test-reports/*.xml"])
+}

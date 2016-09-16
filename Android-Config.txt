@@ -1,0 +1,35 @@
+
+node{
+  stage "Checkout"
+  git credentialsId: "ADD YOUR CRED ID", url: "git@git.tom.redhatmobile.com:jnakfour/Innovation-Lab-Android-Native-Blank-Native-Android-Gradle-App.git"
+
+  stage "Run Emulator"
+  // Android emulator plugin does not support pipeline yet
+  //step([$class: "AndroidEmulator", testResults: "app/build/test-results/debug/*.xml"])
+  withEnv(["PATH+emulator=/opt/android-sdk-linux/tools/"]) {
+      sh "/opt/android-sdk-linux/platform-tools/adb start-server"
+      sh "emulator -engine classic -ports 5730,5731 -avd android-23-emulator -noaudio -no-snapshot-load -no-snapshot-save -no-window &amp;"
+      sh "/var/lib/jenkins/scripts/check-emulator-status"
+      // Unlock emulator screen
+      // Attempting to unlock emulator screen
+      sh "/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 shell input keyevent 82"
+      sh "/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 shell input keyevent 4"
+  }
+
+  stage "Build"
+  withEnv(["ANDROID_HOME=/opt/android-sdk-linux"]) {
+      sh "./gradlew clean assemble connectedAndroidTest test"
+  }
+
+  stage "Archive apk"
+  archive "**/*.apk"
+
+  stage "Archive JUnit tests"
+  step([$class: "JUnitResultArchiver", testResults: "app/build/test-results/debug/*.xml"])
+  
+  stage "Archive Instrumented JUnit tests"
+  step([$class: "JUnitResultArchiver", testResults: "app/build/outputs/androidTest-results/connected/*.xml"])
+
+  stage "Stop Android Emulator and adb"
+  sh "/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 emu kill"
+}

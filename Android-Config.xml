@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.3">
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.6">
+    <script>
+
+node{
+  stage &apos;Checkout&apos;
+  git credentialsId: &apos;ADD YOUR CRED ID&apos;, url: &apos;git@git.tom.redhatmobile.com:jnakfour/Innovation-Lab-Android-Native-Blank-Native-Android-Gradle-App.git&apos;
+
+  stage &apos;Run Emulator&apos;
+  // Android emulator plugin does not support pipeline yet
+  //step([$class: &apos;AndroidEmulator&apos;, testResults: &apos;app/build/test-results/debug/*.xml&apos;])
+  withEnv([&quot;PATH+emulator=/opt/android-sdk-linux/tools/&quot;]) {
+      sh &apos;/opt/android-sdk-linux/platform-tools/adb start-server&apos;
+      //sh &apos;emulator -engine classic -ports 5730,5731 -report-console tcp:5854,max=60 -avd android-23-emulator -no-snapshot-load -no-snapshot-save -no-window&apos;
+      sh &apos;emulator -engine classic -ports 5730,5731 -avd android-23-emulator -noaudio -no-snapshot-load -no-snapshot-save -no-window &amp;&apos;
+      //sh &apos;emulator -port 5730 -avd android-23-emulator -no-boot-anim -noaudio -no-window &amp;&apos;
+      sh &apos;/var/lib/jenkins/scripts/check-emulator-status&apos;
+      // Unlock emulator screen
+      // Attempting to unlock emulator screen
+      sh &apos;/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 shell input keyevent 82&apos;
+      sh &apos;/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 shell input keyevent 4&apos;
+  }
+
+  stage &apos;Build&apos;
+  withEnv([&quot;ANDROID_HOME=/opt/android-sdk-linux&quot;]) {
+      sh &apos;./gradlew clean assemble connectedAndroidTest test&apos;
+  }
+
+  stage &apos;Archive apk&apos;
+  archive &apos;**/*.apk&apos;
+  
+ /* stage &apos;Install apk on Emulator&apos;
+
+  withEnv([&quot;PATH+emulator=/opt/android-sdk-linux/tools/&quot;]) {
+      // uninstall apk first
+      sh &apos;/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 uninstall org.feedhenry.blank&apos;
+      sh &apos;/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 install -r app/build/outputs/apk/app-debug.apk&apos;
+  }*/
+  
+  stage &apos;Archive JUnit tests&apos;
+  step([$class: &apos;JUnitResultArchiver&apos;, testResults: &apos;app/build/test-results/debug/*.xml&apos;])
+  
+  stage &apos;Archive Instrumented JUnit tests&apos;
+  step([$class: &apos;JUnitResultArchiver&apos;, testResults: &apos;app/build/outputs/androidTest-results/connected/*.xml&apos;])
+
+  stage &quot;Stop Android Emulator and adb&quot;
+  sh &apos;/opt/android-sdk-linux/platform-tools/adb -s emulator-5730 emu kill&apos;
+  //sh &apos;/opt/android-sdk-linux/platform-tools/adb kill-server&apos;
+}
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+</flow-definition>
